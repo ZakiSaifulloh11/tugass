@@ -56,14 +56,14 @@ const Sidebar = () => {
   const [isMasterOpen, setIsMasterOpen] = useState(true);
 
   return (
-    <aside className="w-[280px] h-screen bg-[#073b5c] flex flex-col py-6 px-4 shrink-0 overflow-hidden border-r border-white/5">
+    <aside className="w-[280px] h-screen bg-[#52075c] flex flex-col py-6 px-4 shrink-0 overflow-hidden border-r border-white/5">
       {/* Logo Section */}
       <div className="flex items-center gap-3 px-2 mb-8">
-        <div className="w-10 h-10 bg-[#00bcd4] rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-lg">
+        <div className="w-10 h-10 bg-[#f306e7] rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-lg">
           s
         </div>
         <div className="font-bold text-2xl text-white tracking-tight">
-          Salary<span className="text-[#00bcd4]">App</span>
+          Salary<span className="text-[#f30791]">App</span>
         </div>
       </div>
 
