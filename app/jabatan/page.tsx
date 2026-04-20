@@ -1,71 +1,126 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 
+// --- KONFIGURASI ENDPOINT ---
+const API_URL = "https://payroll.politekniklp3i-tasikmalaya.ac.id/api/jabatan";
+const API_DIVISI_URL = "https://payroll.politekniklp3i-tasikmalaya.ac.id/api/divisi";
+
 export default function JabatanPage() {
-  // 1. State Utama Data Jabatan
-  const [dataJabatan, setDataJabatan] = useState([
-    { id: 1, jabatan: "STAFF", divisi: "INFORMATION TECHNOLOGY", gaji: 3000000 },
-    { id: 2, jabatan: "HEAD OF", divisi: "HRD", gaji: 5000000 },
-  ]);
+  // 1. State Data
+  const [dataJabatan, setDataJabatan] = useState<any[]>([]);
+  const [dataDivisi, setDataDivisi] = useState<any[]>([]); 
+  const [isLoading, setIsLoading] = useState(true);
 
   // 2. State Form
   const [form, setForm] = useState({
     jabatan: "",
-    divisi: "Pilih Divisi",
-    gaji: ""
+    id_divisi: "",
+    gaji_pokok: ""
   });
-  const [editId, setEditId] = useState(null);
+  const [editId, setEditId] = useState<number | null>(null);
+
+  // --- HELPER: GET AUTH HEADERS ---
+  // Fungsi ini mengambil token dari local storage seperti yang terlihat di gambar E.jpg
+  const getHeaders = () => {
+    const token = localStorage.getItem("access_token"); 
+    return {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`, 
+    };
+  };
+
+  // --- FUNGSI AMBIL DATA (READ) ---
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Fetch Data Jabatan
+      const resJabatan = await fetch(API_URL, { headers: getHeaders() });
+      const jsonJabatan = await resJabatan.json();
+      
+      // Fetch Data Divisi untuk Dropdown
+      const resDivisi = await fetch(API_DIVISI_URL, { headers: getHeaders() });
+      const jsonDivisi = await resDivisi.json();
+
+      setDataJabatan(Array.isArray(jsonJabatan) ? jsonJabatan : jsonJabatan.data || []);
+      setDataDivisi(Array.isArray(jsonDivisi) ? jsonDivisi : jsonDivisi.data || []);
+    } catch (error) {
+      console.error("Gagal mengambil data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // --- HANDLER FUNCTIONS ---
 
-  // Fungsi Simpan (Tambah & Update)
-  const handleSimpan = () => {
-    if (!form.jabatan || form.divisi === "Pilih Divisi" || !form.gaji) {
+  const handleSimpan = async () => {
+    if (!form.jabatan || !form.id_divisi || !form.gaji_pokok) {
       return alert("Mohon lengkapi semua data!");
     }
 
-    if (editId) {
-      // Logika Update
-      const updated = dataJabatan.map(item => 
-        item.id === editId ? { ...item, ...form, jabatan: form.jabatan.toUpperCase(), gaji: Number(form.gaji) } : item
-      );
-      setDataJabatan(updated);
-      setEditId(null);
-    } else {
-      // Logika Create
-      const newJabatan = {
-        id: Date.now(),
-        jabatan: form.jabatan.toUpperCase(),
-        divisi: form.divisi,
-        gaji: Number(form.gaji)
-      };
-      setDataJabatan([...dataJabatan, newJabatan]);
-    }
+    const payload = {
+      jabatan: form.jabatan.toUpperCase(),
+      id_divisi: parseInt(form.id_divisi),
+      gaji_pokok: parseInt(form.gaji_pokok)
+    };
 
-    setForm({ jabatan: "", divisi: "Pilih Divisi", gaji: "" }); // Reset form
+    try {
+      const method = editId ? "PUT" : "POST";
+      const url = editId ? `${API_URL}/${editId}` : API_URL;
+
+      const response = await fetch(url, {
+        method: method,
+        headers: getHeaders(), // Mengirim token agar tidak Error 401
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        alert(editId ? "Data diperbarui!" : "Data disimpan!");
+        setForm({ jabatan: "", id_divisi: "", gaji_pokok: "" });
+        setEditId(null);
+        fetchData(); 
+      } else {
+        const errData = await response.json();
+        alert(errData.message || "Gagal menyimpan data ke API.");
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan koneksi ke server.");
+    }
   };
 
-  // Fungsi Hapus
-  const handleHapus = (id: any) => {
+  const handleHapus = async (id: number) => {
     if (window.confirm("Yakin ingin menghapus jabatan ini?")) {
-      setDataJabatan(dataJabatan.filter(item => item.id !== id));
+      try {
+        const response = await fetch(`${API_URL}/${id}`, { 
+          method: "DELETE",
+          headers: getHeaders()
+        });
+        if (response.ok) {
+          fetchData();
+        } else {
+          alert("Gagal menghapus data.");
+        }
+      } catch (error) {
+        alert("Terjadi kesalahan saat menghapus.");
+      }
     }
   };
 
-// Cara Cepat (Garis merah langsung hilang)
-const handleEdit = (item: any) => {
-  setEditId(item.id);
-  setForm({
-    jabatan: item.jabatan,
-    divisi: item.divisi,
-    gaji: item.gaji
-  });
-};
+  const handleEdit = (item: any) => {
+    setEditId(item.id);
+    setForm({
+      jabatan: item.jabatan,
+      id_divisi: item.id_divisi.toString(),
+      gaji_pokok: item.gaji_pokok.toString()
+    });
+  };
 
-  // Helper Format Rupiah
-  const formatRupiah = (value : number) => {
+  const formatRupiah = (value: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
@@ -74,7 +129,7 @@ const handleEdit = (item: any) => {
   };
 
   return (
-    <div className="w-full h-screen flex bg-slate-50 dark:bg-black text-slate-900 dark:text-white transition-colors duration-500 overflow-hidden font-sans">
+    <div className="w-full h-screen flex bg-slate-50 dark:bg-black text-slate-900 dark:text-white overflow-hidden font-sans">
       <Sidebar />
 
       <div className="flex flex-1 flex-col overflow-y-auto">
@@ -85,63 +140,68 @@ const handleEdit = (item: any) => {
               <p className="text-sm font-bold leading-tight">Administrator</p>
               <p className="text-xs text-slate-500">Payroll Management</p>
             </div>
-            <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold">A</div>
+            <div className="h-10 w-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold">A</div>
           </div>
         </header>
 
         <main className="p-8">
           <div className="mb-10">
             <h2 className="text-4xl font-extrabold tracking-tight">Management Jabatan</h2>
-            <p className="text-slate-500 mt-2 text-lg">Configure positions and salary structures.</p>
+            <p className="text-slate-500 mt-2 text-lg italic">Konfigurasi struktur posisi dan gaji pokok karyawan.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* FORM SECTION */}
+            {/* --- FORM SECTION --- */}
             <div className="lg:col-span-4">
               <div className="rounded-[32px] bg-white dark:bg-[#0f0f0f] p-8 border border-slate-200 dark:border-white/5 shadow-xl">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-cyan-600 font-bold">
-                    {editId ? "✎" : "+"}
-                  </div>
-                  <h3 className="text-xl font-bold">{editId ? "Ubah Jabatan" : "Tambah Jabatan"}</h3>
-                </div>
+                <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
+                   <span className="text-cyan-500">{editId ? "✎" : "+"}</span>
+                   {editId ? "Ubah Jabatan" : "Tambah Jabatan"}
+                </h3>
 
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-bold text-slate-500 mb-2 ml-1">Nama Jabatan</label>
+                    <label className="block text-sm font-bold text-slate-400 mb-2 ml-1 uppercase tracking-wider">Nama Jabatan</label>
                     <input 
                       type="text" 
                       value={form.jabatan}
                       onChange={(e) => setForm({...form, jabatan: e.target.value})}
-                      placeholder="Contoh: Manager IT"
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-cyan-500 transition-all"
+                      placeholder="Contoh: MANAGER IT"
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-semibold uppercase"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-500 mb-2 ml-1">Pilih Divisi</label>
+                    <label className="block text-sm font-bold text-slate-400 mb-2 ml-1 uppercase tracking-wider">Divisi</label>
                     <select 
-                      value={form.divisi}
-                      onChange={(e) => setForm({...form, divisi: e.target.value})}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-cyan-500 transition-all cursor-pointer"
+                      value={form.id_divisi}
+                      onChange={(e) => setForm({...form, id_divisi: e.target.value})}
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all cursor-pointer font-semibold"
                     >
-                      <option disabled>Pilih Divisi</option>
-                      <option>INFORMATION TECHNOLOGY</option>
-                      <option>EDUCATION</option>
-                      <option>HRD</option>
+                      <option value="">Pilih Divisi</option>
+                      {dataDivisi.map((div) => (
+                        <option key={div.id} value={div.id}>{div.nama_divisi || div.divisi}</option>
+                      ))}
+                      {/* Manual fallback jika data divisi kosong */}
+                      {dataDivisi.length === 0 && (
+                        <>
+                          <option value="1">INFORMATION TECHNOLOGY</option>
+                          <option value="2">HRD</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-500 mb-2 ml-1">Gaji Pokok</label>
+                    <label className="block text-sm font-bold text-slate-400 mb-2 ml-1 uppercase tracking-wider">Gaji Pokok</label>
                     <div className="relative">
                       <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Rp</span>
                       <input 
                         type="number" 
-                        value={form.gaji}
-                        onChange={(e) => setForm({...form, gaji: e.target.value})}
+                        value={form.gaji_pokok}
+                        onChange={(e) => setForm({...form, gaji_pokok: e.target.value})}
                         placeholder="0"
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl pl-12 pr-5 py-3.5 focus:outline-none focus:border-cyan-500 transition-all"
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl pl-12 pr-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-semibold"
                       />
                     </div>
                   </div>
@@ -149,14 +209,14 @@ const handleEdit = (item: any) => {
                   <div className="flex gap-2 pt-4">
                     <button 
                       onClick={handleSimpan}
-                      className="flex-1 bg-[#005a8d] hover:bg-[#0077b6] text-white font-bold py-4 rounded-2xl shadow-lg transition-all"
+                      className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-4 rounded-2xl shadow-lg transition-all"
                     >
                       {editId ? "Update Data" : "Simpan Jabatan"}
                     </button>
                     {editId && (
                       <button 
-                        onClick={() => {setEditId(null); setForm({jabatan: "", divisi: "Pilih Divisi", gaji: ""});}}
-                        className="px-6 bg-slate-100 dark:bg-white/10 font-bold rounded-2xl transition-all"
+                        onClick={() => {setEditId(null); setForm({jabatan: "", id_divisi: "", gaji_pokok: ""});}}
+                        className="px-6 bg-slate-100 dark:bg-white/10 font-bold rounded-2xl"
                       >
                         Batal
                       </button>
@@ -166,13 +226,13 @@ const handleEdit = (item: any) => {
               </div>
             </div>
 
-            {/* TABLE SECTION */}
+            {/* --- TABLE SECTION --- */}
             <div className="lg:col-span-8">
               <div className="rounded-[32px] bg-white dark:bg-[#0f0f0f] border border-slate-200 dark:border-white/5 shadow-xl overflow-hidden">
                 <div className="p-8 flex items-center justify-between border-b border-slate-100 dark:border-white/5">
-                  <h3 className="text-xl font-bold">Data Jabatan</h3>
+                  <h3 className="text-xl font-bold">Daftar Data Jabatan</h3>
                   <span className="bg-cyan-500/10 text-cyan-600 text-[11px] font-bold px-3 py-1 rounded-full border border-cyan-500/20">
-                    ● {dataJabatan.length} Total Posisi
+                    {isLoading ? "Memuat..." : `${dataJabatan.length} Total Data`}
                   </span>
                 </div>
 
@@ -182,26 +242,24 @@ const handleEdit = (item: any) => {
                       <tr className="text-left text-slate-400 text-[12px] uppercase tracking-widest bg-slate-50/50 dark:bg-transparent">
                         <th className="px-6 py-6 font-bold">No</th>
                         <th className="px-6 py-6 font-bold">Jabatan</th>
-                        <th className="px-6 py-6 font-bold">Divisi</th>
+                        <th className="px-6 py-6 font-bold text-center">ID Divisi</th>
                         <th className="px-6 py-6 font-bold">Gaji Pokok</th>
                         <th className="px-6 py-6 font-bold text-right pr-8">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                      {dataJabatan.map((item, index) => (
+                      {isLoading ? (
+                        <tr><td colSpan={5} className="text-center py-10 animate-pulse text-slate-400">Sedang memproses data...</td></tr>
+                      ) : dataJabatan.map((item, index) => (
                         <tr key={item.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all">
                           <td className="px-6 py-6 font-bold text-slate-400">{index + 1}</td>
-                          <td className="px-6 py-6 font-bold text-slate-700 dark:text-slate-200 uppercase">{item.jabatan}</td>
-                          <td className="px-6 py-6">
-                            <span className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[10px] font-bold px-3 py-1.5 rounded-full text-slate-500 uppercase">
-                              {item.divisi}
-                            </span>
-                          </td>
+                          <td className="px-6 py-6 font-bold uppercase">{item.jabatan}</td>
+                          <td className="px-6 py-6 text-center font-bold text-cyan-600">{item.id_divisi}</td>
                           <td className="px-6 py-6 font-bold text-emerald-600 dark:text-emerald-400">
-                            {formatRupiah(item.gaji)}
+                            {formatRupiah(item.gaji_pokok)}
                           </td>
-                          <td className="px-6 py-6 pr-8">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                          <td className="px-6 py-6 pr-8 text-right">
+                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                               <button onClick={() => handleEdit(item)} className="p-2 rounded-lg bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                               </button>

@@ -1,44 +1,96 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 
+const API_URL = "https://payroll.politekniklp3i-tasikmalaya.ac.id/api/konfigurasi";
+
 export default function KonfigurasiPage() {
-  const [dataConfig, setDataConfig] = useState([
-    { id: 1, tahun: "2024", jatahCuti: 12, nilaiUang: 150000, status: "AKTIF" },
-    { id: 2, tahun: "2025", jatahCuti: 14, nilaiUang: 200000, status: "NON-AKTIF" },
-  ]);
+  const [dataConfig, setDataConfig] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     id: null as number | null,
     tahun: "",
-    jatahCuti: "",
-    nilaiUang: "",
-    status: "Aktif"
+    jatah_cuti_tahunan: "",
+    nilai_uang_per_cuti: "",
+    aktif: true
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.tahun || !formData.jatahCuti || !formData.nilaiUang) return alert("Isi semua data!");
-
-    if (formData.id) {
-      setDataConfig(dataConfig.map(item => 
-        item.id === formData.id ? { ...item, tahun: formData.tahun, jatahCuti: Number(formData.jatahCuti), nilaiUang: Number(formData.nilaiUang), status: formData.status.toUpperCase() } : item
-      ));
-    } else {
-      setDataConfig([...dataConfig, { id: Date.now(), tahun: formData.tahun, jatahCuti: Number(formData.jatahCuti), nilaiUang: Number(formData.nilaiUang), status: formData.status.toUpperCase() }]);
+  // 1. FETCH DATA (READ)
+  const fetchData = async () => {
+    try {
+      const response = await fetch(API_URL);
+      const result = await response.json();
+      // Asumsi API mengembalikan array di dalam properti data atau langsung array
+      setDataConfig(Array.isArray(result) ? result : result.data || []);
+    } catch (error) {
+      console.error("Gagal mengambil data:", error);
+    } finally {
+      setLoading(false);
     }
-    resetForm();
   };
 
-  const handleDelete = (id: number) => {
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData({ 
+      ...formData, 
+      [name]: name === "aktif" ? value === "true" : value 
+    });
+  };
+
+  // 2. SUBMIT DATA (CREATE & UPDATE)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.tahun || !formData.jatah_cuti_tahunan || !formData.nilai_uang_per_cuti) {
+      return alert("Isi semua data!");
+    }
+
+    const payload = {
+      tahun: formData.tahun,
+      jatah_cuti_tahunan: Number(formData.jatah_cuti_tahunan),
+      nilai_uang_per_cuti: Number(formData.nilai_uang_per_cuti),
+      aktif: formData.aktif
+    };
+
+    try {
+      const url = formData.id ? `${API_URL}/${formData.id}` : API_URL;
+      const method = formData.id ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert(formData.id ? "Data diperbarui!" : "Data disimpan!");
+        resetForm();
+        fetchData(); // Refresh tabel
+      } else {
+        alert("Terjadi kesalahan pada server.");
+      }
+    } catch (error) {
+      console.error("Gagal menyimpan data:", error);
+    }
+  };
+
+  // 3. DELETE DATA
+  const handleDelete = async (id: number) => {
     if (confirm("Hapus konfigurasi ini?")) {
-      setDataConfig(dataConfig.filter(item => item.id !== id));
-      if (formData.id === id) resetForm();
+      try {
+        const response = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+        if (response.ok) {
+          fetchData();
+          if (formData.id === id) resetForm();
+        }
+      } catch (error) {
+        console.error("Gagal menghapus data:", error);
+      }
     }
   };
 
@@ -46,14 +98,14 @@ export default function KonfigurasiPage() {
     setFormData({
       id: item.id,
       tahun: item.tahun,
-      jatahCuti: item.jatahCuti.toString(),
-      nilaiUang: item.nilaiUang.toString(),
-      status: item.status === "AKTIF" ? "Aktif" : "Non-Aktif"
+      jatah_cuti_tahunan: item.jatah_cuti_tahunan.toString(),
+      nilai_uang_per_cuti: item.nilai_uang_per_cuti.toString(),
+      aktif: item.aktif
     });
   };
 
   const resetForm = () => {
-    setFormData({ id: null, tahun: "", jatahCuti: "", nilaiUang: "", status: "Aktif" });
+    setFormData({ id: null, tahun: "", jatah_cuti_tahunan: "", nilai_uang_per_cuti: "", aktif: true });
   };
 
   return (
@@ -97,19 +149,19 @@ export default function KonfigurasiPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-500 ml-1">Jatah Cuti Tahunan</label>
                     <div className="relative">
-                      <input name="jatahCuti" value={formData.jatahCuti} onChange={handleChange} type="number" placeholder="12" className="input-style pr-16" />
+                      <input name="jatah_cuti_tahunan" value={formData.jatah_cuti_tahunan} onChange={handleChange} type="number" placeholder="12" className="input-style pr-16" />
                       <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">Hari</span>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-500 ml-1">Nilai Uang (Rp)</label>
-                    <input name="nilaiUang" value={formData.nilaiUang} onChange={handleChange} type="number" placeholder="150000" className="input-style" />
+                    <input name="nilai_uang_per_cuti" value={formData.nilai_uang_per_cuti} onChange={handleChange} type="number" placeholder="150000" className="input-style" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-500 ml-1">Status</label>
-                    <select name="status" value={formData.status} onChange={handleChange} className="input-style appearance-none">
-                      <option value="Aktif">Aktif</option>
-                      <option value="Non-Aktif">Non-Aktif</option>
+                    <select name="aktif" value={formData.aktif.toString()} onChange={handleChange} className="input-style appearance-none">
+                      <option value="true">Aktif</option>
+                      <option value="false">Non-Aktif</option>
                     </select>
                   </div>
                   
@@ -143,18 +195,19 @@ export default function KonfigurasiPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                      {dataConfig.map((item, index) => (
+                      {loading ? (
+                        <tr><td colSpan={6} className="text-center py-10">Memuat data...</td></tr>
+                      ) : dataConfig.map((item, index) => (
                         <tr key={item.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all duration-300">
                           <td className="px-6 py-6 font-bold text-slate-400">{index + 1}</td>
                           <td className="px-6 py-6 font-black text-lg">{item.tahun}</td>
-                          <td className="px-6 py-6 font-medium text-slate-600 dark:text-slate-300">{item.jatahCuti} Hari</td>
-                          {/* PERBAIKAN DI SINI: Menampilkan Nilai Uang dengan format Rupiah */}
+                          <td className="px-6 py-6 font-medium text-slate-600 dark:text-slate-300">{item.jatah_cuti_tahunan} Hari</td>
                           <td className="px-6 py-6 font-bold text-emerald-600 dark:text-emerald-400">
-                            Rp {item.nilaiUang.toLocaleString("id-ID")}
+                            Rp {Number(item.nilai_uang_per_cuti).toLocaleString("id-ID")}
                           </td>
                           <td className="px-6 py-6 text-center">
-                            <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.status === 'AKTIF' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
-                              {item.status}
+                            <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.aktif ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+                              {item.aktif ? "AKTIF" : "NON-AKTIF"}
                             </span>
                           </td>
                           <td className="px-6 py-6 pr-8">

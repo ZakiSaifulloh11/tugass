@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Lock, Mail, Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
+import Image from "next/image";
 
-export default function SignIn() {
+export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,18 +19,29 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/login", {
+      const res = await fetch("https://payroll.politekniklp3i-tasikmalaya.ac.id/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Login gagal");
 
-      localStorage.setItem("access_token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      router.push("/dashboard");
+      if (!res.ok) {
+        throw new Error(data.message || "Email atau password salah.");
+      }
+
+      const token = data.token || data.data?.token;
+      const userData = data.user || data.data?.user;
+      const userRole = userData?.role || (email === "hrd@mail.com" ? "admin" : "user");
+
+      if (token) localStorage.setItem("access_token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("userRole", userRole);
+
+      alert(`Login Berhasil sebagai ${userRole === "admin" ? "Admin" : "Karyawan"}!`);
+      router.push(userRole === "admin" ? "/dashboard" : "/home");
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -36,87 +50,125 @@ export default function SignIn() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-black p-4 transition-colors duration-500">
-      {/* Dekorasi Background */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20 dark:opacity-40">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-cyan-500 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-700 blur-[120px]" />
-      </div>
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Dekorasi Background Bulatan Halus */}
+      <div className="absolute top-[-10%] left-[-5%] w-[300px] h-[300px] bg-blue-400/10 rounded-full blur-[80px]" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[300px] h-[300px] bg-indigo-400/10 rounded-full blur-[80px]" />
 
-      <main className="relative w-full max-w-[440px] z-10">
-        <div className="rounded-[40px] bg-white dark:bg-[#0f0f0f] p-10 shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/5 transition-all">
+      <main className="relative z-10 w-full max-w-[480px]">
+        {/* Card Utama */}
+        <div className="bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white p-8 md:p-12 transition-all">
           
-          {/* Logo Area */}
-          <div className="flex flex-col items-center mb-10">
-            <div className="h-16 w-16 rounded-2xl bg-[#005a8d] flex items-center justify-center text-white text-3xl mb-4 shadow-lg shadow-blue-500/20 font-black">
-              S
+          {/* Header & Logo */}
+          <div className="flex flex-col items-center mb-10 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-[#004a7c] to-[#002a45] rounded-2xl flex items-center justify-center shadow-lg mb-6 transform hover:rotate-6 transition-transform">
+               <span className="text-white font-black text-3xl">I</span>
             </div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">SalaryApp</h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium text-center">Welcome back, please login.</p>
+            <h2 className="text-3xl font-black text-[#1a2b3c] tracking-tight">
+              ZAKIAE <span className="text-blue-500">PAY</span>
+            </h2>
+            <p className="text-gray-400 mt-2 font-medium">
+              Silakan login untuk mengakses akun Anda
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-slate-600 dark:text-slate-400 ml-1">Email Address</label>
-              <input
-                type="email"
-                placeholder="admin@mail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all font-medium"
-                required
-              />
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-100 text-red-500 text-sm p-4 rounded-2xl mb-6 flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+              <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Input Email */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                Email Address
+              </label>
+              <div className="relative group">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all font-medium text-slate-900"
+                />
+                <Mail className="absolute left-4 top-4 text-gray-400 group-focus-within:text-[#004a7c] transition-colors" size={20} />
+              </div>
             </div>
 
-            <div className="space-y-2">
+            {/* Input Password */}
+            <div className="space-y-1.5">
               <div className="flex justify-between items-center ml-1">
-                <label className="block text-sm font-bold text-slate-600 dark:text-slate-400">Password</label>
-                <button type="button" className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:underline">Forgot?</button>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                  Password
+                </label>
+                <button type="button" className="text-[11px] font-bold text-[#004a7c] hover:underline uppercase tracking-widest">
+                  Lupa?
+                </button>
               </div>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all font-medium"
-                required
-              />
+              <div className="relative group">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all font-medium text-slate-900"
+                />
+                <Lock className="absolute left-4 top-4 text-gray-400 group-focus-within:text-[#004a7c] transition-colors" size={20} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
 
-            {error && (
-              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs py-3 px-4 rounded-xl font-bold flex items-center gap-2">
-                <span>⚠️</span> {error}
-              </div>
-            )}
-
+            {/* Tombol Login */}
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full overflow-hidden rounded-2xl bg-[#005a8d] py-4 text-white font-black transition-all hover:bg-[#0077b6] hover:shadow-xl hover:shadow-blue-500/20 disabled:opacity-50 active:scale-[0.98]"
+              className="w-full bg-[#004a7c] hover:bg-[#003559] text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-blue-900/10 flex items-center justify-center gap-2 group disabled:bg-gray-300 disabled:cursor-not-allowed mt-4"
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                {loading ? (
-                  <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  "Sign In"
-                )}
-              </span>
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  Sign In
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
-
-            <div className="text-center mt-8 pt-4 border-t border-slate-100 dark:border-white/5">
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                Don't have an account?{" "}
-                <button 
-                  type="button"
-                  onClick={() => router.push("/sign-up")}
-                  className="text-cyan-600 dark:text-cyan-400 font-bold hover:underline ml-1"
-                >
-                  Sign Up Free
-                </button>
-              </p>
-            </div>
           </form>
+
+          {/* Footer Card */}
+          <div className="mt-8 text-center border-t border-gray-50 pt-8">
+            <p className="text-gray-400 font-medium text-sm">
+              Belum punya akun?{" "}
+              <button
+                type="button"
+                className="text-[#004a7c] font-bold hover:underline"
+                onClick={() => router.push("/sign-up")}
+              >
+                Hubungi Admin
+              </button>
+            </p>
+          </div>
         </div>
+
+        {/* Link Kembali ke Beranda */}
+        <button
+          onClick={() => router.push("/")}
+          className="mt-8 mx-auto flex items-center gap-2 text-gray-400 hover:text-[#004a7c] font-bold text-xs uppercase tracking-widest transition-colors group"
+        >
+          <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+          Kembali ke Beranda
+        </button>
       </main>
     </div>
   );
