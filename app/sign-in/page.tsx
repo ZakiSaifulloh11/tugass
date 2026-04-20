@@ -65,7 +65,7 @@ export default function LoginPage() {
                <span className="text-white font-black text-3xl">I</span>
             </div>
             <h2 className="text-3xl font-black text-[#1a2b3c] tracking-tight">
-              ZAKIAE <span className="text-blue-500">PAY</span>
+              ZAKIII <span className="text-blue-500">PAY</span>
             </h2>
             <p className="text-gray-400 mt-2 font-medium">
               Silakan login untuk mengakses akun Anda

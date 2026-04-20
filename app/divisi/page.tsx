@@ -18,7 +18,7 @@ export default function DivisiPage() {
 
   // --- HELPER: Ambil Header dengan Token ---
   const getAuthHeader = () => {
-    const token = localStorage.getItem("access_token");
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     return {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
@@ -39,7 +39,6 @@ export default function DivisiPage() {
       const result = await response.json();
       
       if (response.ok) {
-        // Pastikan mengambil array data yang benar
         setDataDivisi(Array.isArray(result) ? result : result.data || []);
       } else {
         throw new Error(result.message || "Gagal mengambil data");
@@ -57,12 +56,14 @@ export default function DivisiPage() {
 
   // [CREATE & UPDATE] Simpan Data
   const handleSimpan = async (e: React.FormEvent) => {
-    e.preventDefault(); // Mencegah reload halaman
+    e.preventDefault(); 
     
     if (!inputDivisi.trim()) return alert("Nama divisi wajib diisi!");
 
     try {
       setIsSubmitting(true);
+      
+      // LOGIKA EDIT: Jika ada editId maka ke URL /id, jika tidak ke base URL
       const url = editId ? `${API_URL}/${editId}` : API_URL;
       const method = editId ? "PUT" : "POST";
 
@@ -75,8 +76,8 @@ export default function DivisiPage() {
       const result = await response.json();
 
       if (response.ok) {
-        alert(editId ? "Divisi berhasil diupdate!" : "Divisi baru ditambahkan!");
-        handleBatal();
+        alert(editId ? "Divisi berhasil diperbarui!" : "Divisi baru ditambahkan!");
+        handleBatal(); // Reset form setelah berhasil
         fetchDivisi(); // Refresh tabel
       } else {
         alert(`Gagal menyimpan: ${result.message || "Cek kembali data Anda"}`);
@@ -101,21 +102,24 @@ export default function DivisiPage() {
       if (response.ok) {
         alert("Divisi telah dihapus.");
         fetchDivisi();
+        if (editId === id) handleBatal();
       } else {
-        alert("Gagal menghapus data. Mungkin data ini sedang digunakan.");
+        alert("Gagal menghapus data.");
       }
     } catch (error) {
       alert("Koneksi bermasalah.");
     }
   };
 
-  // Persiapan Edit
+  // [EDIT MODE] Persiapan Edit
   const handleEdit = (item: any) => {
+    // Scroll ke atas agar user melihat form yang terisi
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setEditId(item.id);
     setInputDivisi(item.divisi);
   };
 
-  // Reset Form
+  // [CANCEL] Reset Form
   const handleBatal = () => {
     setEditId(null);
     setInputDivisi("");
@@ -152,10 +156,10 @@ export default function DivisiPage() {
             <div className="lg:col-span-4">
               <form 
                 onSubmit={handleSimpan}
-                className="rounded-[32px] bg-white dark:bg-[#0f0f0f] p-8 border border-slate-200 dark:border-white/5 shadow-xl"
+                className="rounded-[32px] bg-white dark:bg-[#0f0f0f] p-8 border border-slate-200 dark:border-white/5 shadow-xl sticky top-8"
               >
                 <div className="flex items-center gap-3 mb-8">
-                  <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${editId ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'}`}>
                     {editId ? <Pencil size={20} /> : <Plus size={20} />}
                   </div>
                   <h3 className="text-xl font-bold">{editId ? "Ubah Divisi" : "Tambah Divisi"}</h3>
@@ -180,19 +184,19 @@ export default function DivisiPage() {
                     <button 
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex-1 bg-[#005a8d] hover:bg-[#0077b6] text-white font-bold py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      className={`flex-1 text-white font-bold py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${editId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-[#005a8d] hover:bg-[#0077b6]'}`}
                     >
                       {isSubmitting ? (
                         <Loader2 className="animate-spin" size={20} />
                       ) : (
-                        <><Save size={18} /> {editId ? "Update" : "Simpan"}</>
+                        <><Save size={18} /> {editId ? "Perbarui" : "Simpan"}</>
                       )}
                     </button>
                     {editId && (
                       <button 
                         type="button"
                         onClick={handleBatal}
-                        className="px-6 bg-slate-100 dark:bg-white/10 text-slate-600 font-bold rounded-2xl transition-all hover:bg-slate-200"
+                        className="px-6 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 font-bold rounded-2xl transition-all hover:bg-slate-200"
                       >
                         <X size={20} />
                       </button>
@@ -215,7 +219,7 @@ export default function DivisiPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left text-slate-400 text-[12px] uppercase tracking-widest bg-slate-50/50">
+                      <tr className="text-left text-slate-400 text-[12px] uppercase tracking-widest bg-slate-50/50 dark:bg-transparent">
                         <th className="px-8 py-6 font-bold">No</th>
                         <th className="px-8 py-6 font-bold">Divisi</th>
                         <th className="px-8 py-6 font-bold text-right">Aksi</th>
@@ -238,7 +242,7 @@ export default function DivisiPage() {
                         </tr>
                       ) : (
                         dataDivisi.map((item, index) => (
-                          <tr key={item.id} className="group hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all">
+                          <tr key={item.id} className={`group hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all ${editId === item.id ? 'bg-orange-500/5' : ''}`}>
                             <td className="px-8 py-6 font-bold text-slate-400 w-20">{index + 1}</td>
                             <td className="px-8 py-6 font-bold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
                               {item.divisi}
